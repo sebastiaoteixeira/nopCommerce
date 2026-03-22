@@ -49,7 +49,7 @@ From an observability standpoint, this event system is the most interesting part
 8. **CheckOrderStatusAsync()** / **SetOrderStatusAsync()** — evaluates order state and transitions it, publishing `OrderStatusChangedEvent`
 9. **ProcessOrderPaidAsync()** — if the payment was captured immediately, fires `OrderPaidEvent`
 
-The constructor takes 40+ dependencies. There is also optional mutex-based locking (`PlaceOrderWithLock` setting) to prevent duplicate orders within a configurable time window, backed by `IStaticCacheManager`.
+There is also optional mutex-based locking (`PlaceOrderWithLock` setting) to prevent duplicate orders within a configurable time window, backed by `IStaticCacheManager`.
 
 #### PaymentService
 
