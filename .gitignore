@@ -161,6 +161,9 @@ $RECYCLE.BIN/
 # Mac crap
 .DS_Store
 
+# Environment variables
+.env
+
 
 #######################
 ## nopCommerce specific
