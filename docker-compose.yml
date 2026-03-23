@@ -4,19 +4,36 @@ services:
         container_name: nopcommerce
         ports:
             - "80:80"
+        volumes:
+            - nopcommerce_appdata:/app/App_Data
         environment:
             OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
             OTEL_SERVICE_NAME: "nopcommerce"
         depends_on:
-            - nopcommerce_database
-            - otel-collector
+            nopcommerce_database:
+                condition: service_healthy
+            otel-collector:
+                condition: service_started
+        develop:
+            watch:
+                - action: sync+restart
+                  path: ./src/Presentation/Nop.Web/bin/Release/net9.0/publish
+                  target: /app
     nopcommerce_database:
         image: "mcr.microsoft.com/mssql/server:2019-latest"
         container_name: nopcommerce_mssql_server
+        volumes:
+            - nopcommerce_sqldata:/var/opt/mssql
         environment:
             SA_PASSWORD: "nopCommerce_db_password"
             ACCEPT_EULA: "Y"
             MSSQL_PID: "Express"
+        healthcheck:
+            test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "nopCommerce_db_password" -C -Q "SELECT 1" || exit 1
+            interval: 10s
+            timeout: 5s
+            retries: 10
+            start_period: 30s
 
     otel-collector:
         image: otel/opentelemetry-collector-contrib:latest
@@ -61,4 +78,5 @@ services:
             - jaeger
 
 volumes:
-  nopcommerce_data:            
+  nopcommerce_appdata:
+  nopcommerce_sqldata:            
