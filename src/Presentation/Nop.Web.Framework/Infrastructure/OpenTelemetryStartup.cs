@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Nop.Core.Infrastructure;
 using Nop.Services.Catalog;
 using Nop.Web.Framework.Mvc.Filters;
-using OpenTelemetry;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -25,14 +25,20 @@ public class OpenTelemetryStartup : INopStartup
             .ConfigureResource(r => r.AddService("nopcommerce"))
             .WithTracing(tracing => tracing
                 .AddAspNetCoreInstrumentation()
-                .AddSource(NopTelemetry.ActivitySource.Name))
+                .AddSource(NopTelemetry.ActivitySource.Name)
+                .AddProcessor(new HttpPathSpanProcessor())
+                .AddOtlpExporter())
             .WithMetrics(metrics => metrics
                 .AddAspNetCoreInstrumentation()
-                .AddMeter(NopTelemetry.Meter.Name))
-            .UseOtlpExporter();
+                .AddMeter(NopTelemetry.Meter.Name)
+                .AddOtlpExporter((exporterOptions, readerOptions) =>
+                {
+                    readerOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = 5000;
+                }));
 
-        // Decorator: overrides the ProductService registration from NopStartup (last-wins in .NET DI)
+        // Decorators: override registrations from NopStartup (last-wins in .NET DI)
         services.AddScoped<IProductService, InstrumentedProductService>();
+        services.AddScoped<IPriceCalculationService, InstrumentedPriceCalculationService>();
 
         // Global action filter — no change to BaseController needed
         services.Configure<MvcOptions>(options =>

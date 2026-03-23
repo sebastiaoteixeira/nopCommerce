@@ -18,8 +18,11 @@ public class TracingActionFilter : IAsyncActionFilter
         using var activity = NopTelemetry.ActivitySource.StartActivity($"{controller}Controller.{action}");
         activity?.SetTag("mvc.controller", controller);
         activity?.SetTag("mvc.action", action);
+        activity?.SetTag("url.path", context.HttpContext.Request.Path.Value);
 
         var executedContext = await next();
+
+        activity?.SetTag("http.response.status_code", context.HttpContext.Response.StatusCode);
 
         if (executedContext.Exception != null && !executedContext.ExceptionHandled)
         {

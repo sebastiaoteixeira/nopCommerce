@@ -100,6 +100,8 @@ public class InstrumentedProductService : ProductService
         using var activity = NopTelemetry.ActivitySource.StartActivity("ProductService.SearchProducts");
         var stopwatch = Stopwatch.StartNew();
 
+        activity?.SetTag("db.system", "mssql");
+
         try
         {
             var result = await base.SearchProductsAsync(
@@ -120,6 +122,9 @@ public class InstrumentedProductService : ProductService
             activity?.SetTag("search.result_count", result.TotalCount);
 
             NopTelemetry.SearchDuration.Record(stopwatch.Elapsed.TotalMilliseconds,
+                new KeyValuePair<string, object>("search.has_keywords", !string.IsNullOrEmpty(keywords)));
+
+            NopTelemetry.SearchResultCount.Record(result.TotalCount,
                 new KeyValuePair<string, object>("search.has_keywords", !string.IsNullOrEmpty(keywords)));
 
             if (result.TotalCount == 0)
