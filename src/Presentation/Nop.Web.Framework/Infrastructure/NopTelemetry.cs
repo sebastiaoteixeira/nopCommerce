@@ -38,4 +38,29 @@ public static class NopTelemetry
             "nopcommerce.catalog.pricing.duration",
             unit: "ms",
             description: "Duration of price calculation operations");
+
+    /// <summary>Product repository operation duration in milliseconds</summary>
+    public static readonly Histogram<double> RepositoryDuration =
+        Meter.CreateHistogram<double>(
+            "nopcommerce.catalog.repository.duration",
+            unit: "ms",
+            description: "Duration of product repository operations");
+
+    /// <summary>Search count per keyword (for top searches ranking)</summary>
+    public static readonly Counter<long> SearchByKeyword =
+        Meter.CreateCounter<long>(
+            "nopcommerce.catalog.search.by_keyword",
+            description: "Search count per keyword term");
+
+    /// <summary>Product page view count per URL path (clicked through to detail page)</summary>
+    public static readonly Counter<long> ProductPageViews =
+        Meter.CreateCounter<long>(
+            "nopcommerce.catalog.product.page_views",
+            description: "Product detail page views per URL path");
+
+    /// <summary>Product impressions in search results (shown in catalog listings)</summary>
+    public static readonly Counter<long> ProductImpressions =
+        Meter.CreateCounter<long>(
+            "nopcommerce.catalog.product.impressions",
+            description: "Product appearances in search result listings");
 }

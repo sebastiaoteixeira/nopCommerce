@@ -4,48 +4,356 @@
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
+  "graphTooltip": 1,
   "id": null,
   "links": [],
   "refresh": "5s",
   "panels": [
     {
+      "type": "row",
+      "title": "BI Indicators",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "title": "Average Results per Search",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 1 },
+      "id": 6,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "green", "value": 3 }
+            ]
+          },
+          "min": 0,
+          "max": 20
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(nopcommerce_catalog_search_result_count_results_sum[1m])) / sum(rate(nopcommerce_catalog_search_result_count_results_count[1m]))",
+          "legendFormat": "avg results",
+          "refId": "A",
+          "interval": "5s"
+        }
+      ]
+    },
+    {
+      "title": "Empty Results Ratio",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 1 },
+      "id": 3,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "orange", "value": 25 },
+              { "color": "red", "value": 50 }
+            ]
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(nopcommerce_catalog_search_empty_results_total[1m])) / sum(rate(nopcommerce_catalog_search_duration_milliseconds_count[1m]))) * 100",
+          "legendFormat": "empty %",
+          "refId": "A",
+          "interval": "5s"
+        }
+      ]
+    },
+    {
+      "title": "Search Requests by Keyword Presence",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 5,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 25,
+            "lineWidth": 2,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "with keywords" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "without keywords" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(nopcommerce_catalog_search_duration_milliseconds_count{search_has_keywords=\"true\"}[1m]))",
+          "legendFormat": "with keywords",
+          "refId": "A",
+          "interval": "5s"
+        },
+        {
+          "expr": "sum(rate(nopcommerce_catalog_search_duration_milliseconds_count{search_has_keywords=\"false\"}[1m]))",
+          "legendFormat": "without keywords",
+          "refId": "B",
+          "interval": "5s"
+        }
+      ]
+    },
+    {
+      "title": "Empty Results Ratio Over Time",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 9 },
+      "id": 30,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "gradientMode": "scheme",
+            "spanNulls": true,
+            "thresholdsStyle": { "mode": "area" }
+          },
+          "color": { "mode": "continuous-GrYlRd" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 20 },
+              { "color": "red", "value": 50 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(nopcommerce_catalog_search_empty_results_total[1m])) / sum(rate(nopcommerce_catalog_search_duration_milliseconds_count[1m]))) * 100",
+          "legendFormat": "empty %",
+          "refId": "A",
+          "interval": "5s"
+        }
+      ]
+    },
+    {
+      "title": "Top Searches",
+      "type": "bargauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 9 },
+      "id": 40,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          },
+          "color": { "mode": "continuous-BlPu" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "minVizWidth": 0,
+        "minVizHeight": 10
+      },
+      "targets": [
+        {
+          "expr": "topk(10, round(sum by (search_keyword) (increase(nopcommerce_catalog_search_by_keyword_total[5m]))))",
+          "legendFormat": "{{search_keyword}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "title": "Top Products Clicked",
+      "type": "bargauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 9 },
+      "id": 41,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "color": { "mode": "continuous-GrYlRd" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "minVizWidth": 0,
+        "minVizHeight": 10
+      },
+      "targets": [
+        {
+          "expr": "topk(10, round(sum by (product_name) (increase(nopcommerce_catalog_product_page_views_total[5m]))))",
+          "legendFormat": "{{product_name}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "title": "Top Products in Results (Impressions)",
+      "type": "bargauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "id": 42,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "super-light-purple", "value": null }
+            ]
+          },
+          "color": { "mode": "continuous-BlPu" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "minVizWidth": 0,
+        "minVizHeight": 10
+      },
+      "targets": [
+        {
+          "expr": "topk(10, round(sum by (product_name) (increase(nopcommerce_catalog_product_impressions_total[5m]))))",
+          "legendFormat": "{{product_name}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "title": "Search Result Distribution",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "id": 31,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "gradientMode": "opacity",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "avg results" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "purple" } }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(nopcommerce_catalog_search_result_count_results_sum[1m])) / sum(rate(nopcommerce_catalog_search_result_count_results_count[1m]))",
+          "legendFormat": "avg results",
+          "refId": "A",
+          "interval": "5s"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Product Search, Catalog & Pricing Pipeline",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 101,
+      "collapsed": false,
+      "panels": []
+    },
+    {
       "title": "Trace Explorer",
-      "type": "traces",
-      "datasource": {
-        "type": "jaeger",
-        "uid": "jaeger"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
+      "type": "table",
+      "datasource": { "type": "jaeger", "uid": "jaeger" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 26 },
       "id": 1,
       "targets": [
         {
           "refId": "A",
           "queryType": "search",
           "service": "nopcommerce",
-          "limit": 20,
-          "interval": "5s"
+          "operation": "CatalogController.Search",
+          "limit": 20
         }
       ]
     },
     {
       "title": "Search Duration (p50 / p95 / p99)",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
       "id": 2,
       "fieldConfig": {
         "defaults": {
@@ -53,10 +361,34 @@
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "smooth",
-            "fillOpacity": 10
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "pointSize": 5,
+            "showPoints": "auto"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "p50" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p95" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p99" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+            ]
+          }
+        ]
       },
       "targets": [
         {
@@ -80,157 +412,10 @@
       ]
     },
     {
-      "title": "Empty Results Ratio",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "id": 3,
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 20
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "(sum(rate(nopcommerce_catalog_search_empty_results_total[1m])) / sum(rate(nopcommerce_catalog_search_duration_milliseconds_count[1m]))) * 100",
-          "legendFormat": "empty %",
-          "refId": "A",
-          "interval": "5s"
-        }
-      ]
-    },
-    {
-      "title": "HTTP Error Rate (5xx)",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "id": 4,
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 50
-          },
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "red"
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[1m]))",
-          "legendFormat": "5xx errors/s",
-          "refId": "A",
-          "interval": "5s"
-        }
-      ]
-    },
-    {
-      "title": "Search Requests by Keyword Presence",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "id": 5,
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 15
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(nopcommerce_catalog_search_duration_milliseconds_count{search_has_keywords=\"true\"}[10s]))",
-          "legendFormat": "with keywords",
-          "refId": "A",
-          "interval": "5s"
-        },
-        {
-          "expr": "sum(rate(nopcommerce_catalog_search_duration_milliseconds_count{search_has_keywords=\"false\"}[10s]))",
-          "legendFormat": "without keywords",
-          "refId": "B",
-          "interval": "5s"
-        }
-      ]
-    },
-    {
-      "title": "Average Results per Search",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 24
-      },
-      "id": 6,
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(nopcommerce_catalog_search_result_count_results_sum[1m])) / sum(rate(nopcommerce_catalog_search_result_count_results_count[1m]))",
-          "legendFormat": "avg results",
-          "refId": "A",
-          "interval": "5s"
-        }
-      ]
-    },
-    {
       "title": "Pricing Duration (p50 / p95 / p99)",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 32
-      },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
       "id": 8,
       "fieldConfig": {
         "defaults": {
@@ -238,10 +423,34 @@
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "smooth",
-            "fillOpacity": 10
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "pointSize": 5,
+            "showPoints": "auto"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "p50" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p95" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p99" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+            ]
+          }
+        ]
       },
       "targets": [
         {
@@ -265,26 +474,106 @@
       ]
     },
     {
+      "title": "Search Throughput",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+      "id": 32,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 40,
+            "lineWidth": 1,
+            "gradientMode": "hue",
+            "stacking": { "mode": "normal" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "keyword searches" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "browse searches" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-orange" } }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(nopcommerce_catalog_search_duration_milliseconds_count{search_has_keywords=\"true\"}[1m]))",
+          "legendFormat": "keyword searches",
+          "refId": "A",
+          "interval": "5s"
+        },
+        {
+          "expr": "sum(rate(nopcommerce_catalog_search_duration_milliseconds_count{search_has_keywords=\"false\"}[1m]))",
+          "legendFormat": "browse searches",
+          "refId": "B",
+          "interval": "5s"
+        }
+      ]
+    },
+    {
+      "title": "Pricing Throughput",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+      "id": 33,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 40,
+            "lineWidth": 1,
+            "gradientMode": "hue"
+          },
+          "color": { "mode": "fixed", "fixedColor": "semi-dark-purple" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(nopcommerce_catalog_pricing_duration_milliseconds_count[1m]))",
+          "legendFormat": "pricing ops/s",
+          "refId": "A",
+          "interval": "5s"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "General Performance Indicators",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
+      "id": 102,
+      "collapsed": false,
+      "panels": []
+    },
+    {
       "title": "HTTP Request Rate",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 24
-      },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 51 },
       "id": 7,
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 20
-          }
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "gradientMode": "opacity",
+            "spanNulls": true
+          },
+          "color": { "mode": "fixed", "fixedColor": "semi-dark-green" }
         },
         "overrides": []
       },
@@ -296,24 +585,187 @@
           "interval": "5s"
         }
       ]
+    },
+    {
+      "title": "HTTP Error Rate (5xx)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 51 },
+      "id": 4,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 1,
+            "gradientMode": "scheme"
+          },
+          "color": { "mode": "fixed", "fixedColor": "dark-red" },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[1m]))",
+          "legendFormat": "5xx errors/s",
+          "refId": "A",
+          "interval": "5s"
+        }
+      ]
+    },
+    {
+      "title": "HTTP Response Time (p50 / p95 / p99)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 59 },
+      "id": 34,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "p50" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p95" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p99" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_request_duration_seconds_bucket[1m])))",
+          "legendFormat": "p50",
+          "refId": "A",
+          "interval": "5s"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket[1m])))",
+          "legendFormat": "p95",
+          "refId": "B",
+          "interval": "5s"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket[1m])))",
+          "legendFormat": "p99",
+          "refId": "C",
+          "interval": "5s"
+        }
+      ]
+    },
+    {
+      "title": "HTTP Status Code Distribution",
+      "type": "piechart",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 59 },
+      "id": 35,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {}
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "2xx" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "3xx" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "4xx" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "5xx" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "pieType": "donut",
+        "legend": { "displayMode": "list", "placement": "right" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(http_server_request_duration_seconds_count{http_response_status_code=~\"2..\"}[5m]))",
+          "legendFormat": "2xx",
+          "refId": "A",
+          "interval": "5s"
+        },
+        {
+          "expr": "sum(increase(http_server_request_duration_seconds_count{http_response_status_code=~\"3..\"}[5m]))",
+          "legendFormat": "3xx",
+          "refId": "B",
+          "interval": "5s"
+        },
+        {
+          "expr": "sum(increase(http_server_request_duration_seconds_count{http_response_status_code=~\"4..\"}[5m]))",
+          "legendFormat": "4xx",
+          "refId": "C",
+          "interval": "5s"
+        },
+        {
+          "expr": "sum(increase(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m]))",
+          "legendFormat": "5xx",
+          "refId": "D",
+          "interval": "5s"
+        }
+      ]
     }
   ],
   "schemaVersion": 39,
   "tags": [
     "nopcommerce",
     "catalog",
-    "search"
+    "search",
+    "observability"
   ],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "nopCommerce \u2014 Catalog Search Flow",
+  "title": "nopCommerce - Catalog Search Flow",
   "uid": "nopcommerce-catalog-search",
   "version": 1
 }

@@ -121,16 +121,36 @@ public class InstrumentedProductService : ProductService
             activity?.SetTag("search.page_size", pageSize);
             activity?.SetTag("search.result_count", result.TotalCount);
 
+            var hasKeywords = !string.IsNullOrEmpty(keywords);
+
             NopTelemetry.SearchDuration.Record(stopwatch.Elapsed.TotalMilliseconds,
-                new KeyValuePair<string, object>("search.has_keywords", !string.IsNullOrEmpty(keywords)));
+                new KeyValuePair<string, object>("search.has_keywords", hasKeywords));
 
             NopTelemetry.SearchResultCount.Record(result.TotalCount,
-                new KeyValuePair<string, object>("search.has_keywords", !string.IsNullOrEmpty(keywords)));
+                new KeyValuePair<string, object>("search.has_keywords", hasKeywords));
+
+            // Only record BI metrics for display queries, not internal
+            // price-range probes (pageSize=1) from CatalogModelFactory
+            if (pageSize > 1)
+            {
+                if (hasKeywords)
+                {
+                    var normalizedKeyword = keywords.Trim().ToLowerInvariant();
+                    NopTelemetry.SearchByKeyword.Add(1,
+                        new KeyValuePair<string, object>("search.keyword", normalizedKeyword));
+                }
+
+                foreach (var product in result)
+                {
+                    NopTelemetry.ProductImpressions.Add(1,
+                        new KeyValuePair<string, object>("product.name", product.Name));
+                }
+            }
 
             if (result.TotalCount == 0)
             {
                 NopTelemetry.SearchEmptyResults.Add(1,
-                    new KeyValuePair<string, object>("search.has_keywords", !string.IsNullOrEmpty(keywords)));
+                    new KeyValuePair<string, object>("search.has_keywords", hasKeywords));
             }
 
             return result;

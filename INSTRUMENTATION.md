@@ -6,7 +6,7 @@
 
 ## Design Patterns Applied
 
-### 1. Decorator Pattern — `InstrumentedProductService`
+### 1. Decorator Pattern  - `InstrumentedProductService`
 
 `InstrumentedProductService` inherits from `ProductService` and overrides only `SearchProductsAsync` to wrap it with tracing and metrics. All other methods are inherited unchanged.
 
@@ -14,20 +14,28 @@
 
 **Registration:** `OpenTelemetryStartup` (Order 2100) registers `InstrumentedProductService` as `IProductService` after `NopStartup` (Order 2000), leveraging .NET DI's last-registration-wins behavior.
 
-### 2. AOP via Action Filter — `TracingActionFilter`
+### 2. AOP via Action Filter  - `TracingActionFilter`
 
 A global `IAsyncActionFilter` registered through `MvcOptions.Filters` creates an Activity span for every controller action. This provides controller-level tracing without touching `BaseController` or any controller class.
 
-### 3. Middleware Pipeline — `OpenTelemetryStartup`
+### 3. Decorator Pattern  - `InstrumentedProductRepository`
+
+`InstrumentedProductRepository` inherits from `EntityRepository<Product>` and overrides the key repository operations (`GetByIdAsync`, `GetAllPagedAsync`, `GetAllAsync`, `InsertAsync`, `UpdateAsync`, `DeleteAsync`) to wrap each with an Activity span and a `RepositoryDuration` histogram metric.
+
+**Why this layer matters:** `ProductService.SearchProductsAsync` builds LINQ queries on `IRepository<Product>.Table` (an `IQueryable`), which materialises inside `GetAllPagedAsync`. Without repository-level instrumentation, the time spent inside the repository (query materialisation, caching, event publishing) is invisible  - only the aggregate service duration is captured. The repository decorator exposes this hidden layer.
+
+**Registration:** The open-generic `IRepository<>` → `EntityRepository<>` is registered at Order 10 in `NopDbStartup`. `OpenTelemetryStartup` (Order 2100) registers the closed-generic `IRepository<Product>` → `InstrumentedProductRepository`, which takes precedence in .NET DI.
+
+### 4. Middleware Pipeline  - `OpenTelemetryStartup`
 
 Follows the `INopStartup` pattern used throughout nopCommerce. Responsible for:
 - Registering the OpenTelemetry SDK (tracing + metrics + OTLP exporter)
-- Wiring the decorator (`InstrumentedProductService`)
+- Wiring the decorators (`InstrumentedProductService`, `InstrumentedPriceCalculationService`, `InstrumentedProductRepository`)
 - Adding the global action filter
 
 ### 4. Dependency Inversion Principle
 
-The system depends on the `IProductService` abstraction. Swapping `ProductService` for `InstrumentedProductService` requires no changes to any consumer — `CatalogModelFactory`, `ProductModelFactory`, and controllers all receive the instrumented version automatically through DI.
+The system depends on the `IProductService` abstraction. Swapping `ProductService` for `InstrumentedProductService` requires no changes to any consumer  - `CatalogModelFactory`, `ProductModelFactory`, and controllers all receive the instrumented version automatically through DI.
 
 ### 5. Separation of Concerns
 
@@ -35,7 +43,7 @@ All telemetry code is isolated in `Nop.Web.Framework/Infrastructure/` and `Nop.W
 
 ## Diagrams
 
-### 1. Request Flow — Search and View Product
+### 1. Request Flow  - Search and View Product
 
 How a user request flows through the instrumented components:
 
@@ -46,8 +54,10 @@ sequenceDiagram
     participant Filter as TracingActionFilter<br/>(AOP)
     participant Controller as CatalogController
     participant Factory as CatalogModelFactory
-    participant Decorator as InstrumentedProductService<br/>(Decorator)
+    participant SvcDecorator as InstrumentedProductService<br/>(Service Decorator)
     participant Base as ProductService
+    participant RepoDecorator as InstrumentedProductRepository<br/>(Repository Decorator)
+    participant Repo as EntityRepository
     participant DB as Database
 
     Browser->>ASP: GET /search?q=laptop
@@ -58,24 +68,32 @@ sequenceDiagram
 
     Filter->>Controller: Search()
     Controller->>Factory: PrepareSearchModelAsync()
-    Factory->>Decorator: SearchProductsAsync()
-    Note over Decorator: Span: ProductService.SearchProducts<br/>+ start Stopwatch
+    Factory->>SvcDecorator: SearchProductsAsync()
+    Note over SvcDecorator: Span: ProductService.SearchProducts
 
-    Decorator->>Base: base.SearchProductsAsync()
-    Base->>DB: SQL query
-    DB-->>Base: results
-    Base-->>Decorator: IPagedList<Product>
+    SvcDecorator->>Base: base.SearchProductsAsync()
+    Base->>RepoDecorator: GetAllPagedAsync()
+    Note over RepoDecorator: Span: ProductRepository.GetAllPaged
 
-    Note over Decorator: Record SearchDuration histogram<br/>Check empty results counter<br/>Tag: keywords_present, result_count
+    RepoDecorator->>Repo: base.GetAllPagedAsync()
+    Repo->>DB: SQL query
+    DB-->>Repo: rows
+    Repo-->>RepoDecorator: IPagedList<Product>
+    Note over RepoDecorator: Record RepositoryDuration histogram
 
-    Decorator-->>Factory: IPagedList<Product>
+    RepoDecorator-->>Base: IPagedList<Product>
+    Base-->>SvcDecorator: IPagedList<Product>
+
+    Note over SvcDecorator: Record SearchDuration histogram<br/>Check empty results counter<br/>Tag: keywords_present, result_count
+
+    SvcDecorator-->>Factory: IPagedList<Product>
     Factory-->>Controller: SearchModel
     Controller-->>Filter: ViewResult
     Filter-->>ASP: response
     ASP-->>Browser: HTML
 ```
 
-### 2. Decorator Pattern — DI Registration
+### 2. Decorator Pattern  - DI Registration
 
 How `InstrumentedProductService` replaces `ProductService` without changing consumers:
 
@@ -130,6 +148,8 @@ flowchart LR
         A[ASP.NET Core\nauto-instrumentation] --> OTLP
         B[TracingActionFilter\ncontroller spans] --> OTLP
         C[InstrumentedProductService\nsearch spans + metrics] --> OTLP
+        D[InstrumentedProductRepository\nrepository spans + metrics] --> OTLP
+        E[InstrumentedPriceCalculationService\npricing spans + metrics] --> OTLP
         OTLP[OTLP Exporter\ngRPC :4317]
     end
 
@@ -153,21 +173,21 @@ Three layers of protection before telemetry reaches backends:
 
 ```mermaid
 flowchart TD
-    subgraph Layer 1 — Code
+    subgraph Layer 1  - Code
         direction LR
         L1[InstrumentedProductService]
         L1 -->|tags only| T1["search.keywords_present: true\nsearch.result_count: 42\nsearch.page_size: 12"]
         L1 -.->|never tags| X1["keywords, email,\nIP, customer data"]
     end
 
-    subgraph Layer 2 — ASP.NET Core Defaults
+    subgraph Layer 2  - ASP.NET Core Defaults
         direction LR
         L2[Auto-instrumentation]
         L2 -->|captures| T2["http.method: GET\nhttp.route: /search\nhttp.status_code: 200"]
         L2 -.->|omits by default| X2["url.query, request body"]
     end
 
-    subgraph Layer 3 — OTel Collector
+    subgraph Layer 3  - OTel Collector
         direction LR
         L3["attributes/sanitize\nprocessor"]
         L3 -->|deletes| X3["url.query\nhttp.url\nuser_agent.original\nclient.address\nnet.peer.ip\ncookie headers"]
@@ -187,11 +207,18 @@ flowchart TD
 [auto] HTTP GET /search                        ← ASP.NET Core auto-instrumentation
   └── CatalogController.Search                 ← TracingActionFilter
        └── ProductService.SearchProducts        ← InstrumentedProductService
-              + nopcommerce.catalog.search.duration (histogram)
-              + nopcommerce.catalog.search.empty_results (counter)
+            │  + nopcommerce.catalog.search.duration (histogram)
+            │  + nopcommerce.catalog.search.empty_results (counter)
+            │  + nopcommerce.catalog.search.result_count (histogram)
+            └── ProductRepository.GetAllPaged   ← InstrumentedProductRepository
+                   + nopcommerce.catalog.repository.duration (histogram)
 
 [auto] HTTP GET /product/{slug}                ← ASP.NET Core auto-instrumentation
   └── ProductController.ProductDetails          ← TracingActionFilter
+       ├── PriceCalculationService.GetFinalPrice ← InstrumentedPriceCalculationService
+       │      + nopcommerce.catalog.pricing.duration (histogram)
+       └── ProductRepository.GetById            ← InstrumentedProductRepository
+              + nopcommerce.catalog.repository.duration (histogram)
 ```
 
 ## Custom Metrics
@@ -200,6 +227,9 @@ flowchart TD
 |--------|------|------|---------------|
 | `nopcommerce.catalog.search.duration` | Histogram (ms) | `search.has_keywords` | Spike detection for DB query regression or search plugin timeout. The `has_keywords` tag isolates keyword-driven vs. browse-based searches. |
 | `nopcommerce.catalog.search.empty_results` | Counter | `search.has_keywords` | Spike indicates catalog data deleted/unpublished, broken search index, or bot probing. Actionable: check recent catalog changes. |
+| `nopcommerce.catalog.search.result_count` | Histogram | `search.has_keywords` | Tracks result set sizes. A sudden drop in average results signals catalog issues (products unpublished, broken filters). Combined with duration, reveals if large result sets correlate with slow queries. |
+| `nopcommerce.catalog.pricing.duration` | Histogram (ms) | `pricing.has_discount` | Pricing is called per product on every page view. A spike means discount calculation or tier pricing logic is degrading. The `has_discount` tag isolates discount-path overhead from base pricing. |
+| `nopcommerce.catalog.repository.duration` | Histogram (ms) | `db.operation` | Tracks time spent inside repository operations (query materialisation, caching, event publishing). The `db.operation` tag (GetById, GetAllPaged, GetAll, Insert, Update, Delete) isolates which operation is slow. A spike in GetAllPaged without a corresponding spike in SearchDuration points to database-level issues rather than application logic. |
 
 ## PII Protection (3 layers)
 
@@ -212,23 +242,26 @@ flowchart TD
 | File | Change |
 |------|--------|
 | `Nop.Web.Framework.csproj` | Added 3 OTel NuGet packages |
-| `Infrastructure/NopTelemetry.cs` | **New** — ActivitySource + Meter definitions |
-| `Infrastructure/InstrumentedProductService.cs` | **New** — Decorator with tracing/metrics |
-| `Infrastructure/OpenTelemetryStartup.cs` | **New** — INopStartup for OTel SDK + DI wiring |
-| `Mvc/Filters/TracingActionFilter.cs` | **New** — Global action filter for controller spans |
+| `Infrastructure/NopTelemetry.cs` | **New**  - ActivitySource + Meter definitions |
+| `Infrastructure/InstrumentedProductService.cs` | **New**  - Decorator with tracing/metrics |
+| `Infrastructure/OpenTelemetryStartup.cs` | **New**  - INopStartup for OTel SDK + DI wiring |
+| `Infrastructure/InstrumentedPriceCalculationService.cs` | **New**  - Decorator with pricing tracing |
+| `Infrastructure/InstrumentedProductRepository.cs` | **New**  - Decorator with repository-level tracing |
+| `Infrastructure/HttpPathSpanProcessor.cs` | **New**  - Custom processor for expressive trace names |
+| `Mvc/Filters/TracingActionFilter.cs` | **New**  - Global action filter for controller spans |
 | `otel-collector-config.yaml` | Added PII sanitization processor |
 | `docker-compose.yml` | Added OTel env vars to nopcommerce_web |
-| `grafana/provisioning/dashboards/` | **New** — Dashboard provisioning + JSON |
-| `loadtest/search-flow.js` | **New** — k6 load test script |
+| `grafana/provisioning/dashboards/` | **New**  - Dashboard provisioning + JSON |
+| `loadtest/search-flow.js` | **New**  - k6 load test script |
 
 ## Files with Zero Changes
 
-`ProductService.cs`, `CatalogModelFactory.cs`, `ProductModelFactory.cs`, `BaseController.cs`, all controllers, all factories, all services.
+`ProductService.cs`, `PriceCalculationService.cs`, `EntityRepository.cs`, `CatalogModelFactory.cs`, `ProductModelFactory.cs`, `BaseController.cs`, all controllers, all factories, all services.
 
 ## Verification
 
-1. `dotnet build src/NopCommerce.sln -c Release` — compiles
-2. `docker compose up --build -d` — all containers healthy
+1. `dotnet build src/NopCommerce.sln -c Release`  - compiles
+2. `docker compose up --build -d`  - all containers healthy
 3. Browse `/search` → trace in Jaeger at `:16686` with 3-level span nesting
 4. Click product → trace with action filter span
 5. Prometheus at `:9090` → custom metrics present

@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Nop.Core.Domain.Catalog;
 using Nop.Core.Infrastructure;
+using Nop.Data;
 using Nop.Services.Catalog;
 using Nop.Web.Framework.Mvc.Filters;
 using OpenTelemetry.Exporter;
@@ -39,6 +41,7 @@ public class OpenTelemetryStartup : INopStartup
         // Decorators: override registrations from NopStartup (last-wins in .NET DI)
         services.AddScoped<IProductService, InstrumentedProductService>();
         services.AddScoped<IPriceCalculationService, InstrumentedPriceCalculationService>();
+        services.AddScoped<IRepository<Product>, InstrumentedProductRepository>();
 
         // Global action filter — no change to BaseController needed
         services.Configure<MvcOptions>(options =>

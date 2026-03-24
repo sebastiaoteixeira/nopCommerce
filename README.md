@@ -78,3 +78,96 @@ Create a new graphical theme or develop a new plugin or integration and sell it 
 ### Contribute ###
 
 As a free and open-source project, we are very grateful to everyone who helps us to develop nopCommerce. Please find more details about the options and bonuses for contributors at [contribute page](https://www.nopcommerce.com/contribute?utm_source=github&utm_medium=referral&utm_campaign=contribute&utm_content=text).
+
+
+## Observability Setup
+
+This fork adds OpenTelemetry instrumentation to the "Customer searches and views a product" flow (Catalogue · Search · Pricing).
+
+### Architecture Diagram
+
+![Component Diagram](diagrams/component-diagram.png)
+
+### Quick Start
+
+Build and run the instrumented application:
+
+```bash
+docker compose up --build -d
+```
+
+Access the services:
+
+| Service | URL |
+|---------|-----|
+| nopCommerce | http://localhost |
+| Grafana | http://localhost:3000 |
+| Jaeger | http://localhost:16686 |
+| Prometheus | http://localhost:9090 |
+
+### Run the Load Test
+
+Execute the k6 load test to generate telemetry data:
+
+```bash
+k6 run loadtest/search-flow.js
+```
+
+### Dashboard Screenshots
+
+#### BI Indicators
+![BI Indicators](screenshots/grafana-bi-indicators.png)
+
+#### Product Search, Catalog & Pricing Pipeline
+![Pipeline](screenshots/grafana-pipeline.png)
+
+#### General Performance Indicators
+![General Performance](screenshots/grafana-general-performance.png)
+
+#### Jaeger — Trace Search
+![Jaeger Search](screenshots/jaeger-search-traces.png)
+
+#### Jaeger — Trace Detail (Search Pipeline)
+![Jaeger Trace Detail](screenshots/jaeger-trace-detail.png)
+
+### Custom Metrics
+
+| Metric | Type | Unit | Justification |
+|--------|------|------|---------------|
+| `nopcommerce.catalog.search.duration` | Histogram | ms | Tracks search query latency to identify performance degradation |
+| `nopcommerce.catalog.search.empty_results` | Counter | - | Monitors zero-result queries for catalog completeness and UX issues |
+| `nopcommerce.catalog.search.result_count` | Histogram | - | Measures result distribution to optimize search relevance and pagination |
+| `nopcommerce.catalog.search.by_keyword` | Counter | - | Ranks most searched keywords for BI (Top Searches panel) |
+| `nopcommerce.catalog.product.page_views` | Counter | - | Tracks product detail page clicks by product name (Top Products Clicked) |
+| `nopcommerce.catalog.product.impressions` | Counter | - | Counts product appearances in search results (Top Products Impressions) |
+| `nopcommerce.catalog.pricing.duration` | Histogram | ms | Identifies pricing calculation bottlenecks affecting checkout flows |
+| `nopcommerce.catalog.repository.duration` | Histogram | ms | Tracks repository operation latency (query materialisation, caching) by operation type |
+
+### Sensitive Data Protection
+
+Three-layer PII protection strategy:
+
+1. **Code-level tags**: Only structural metadata (booleans, counts, IDs)  - never keywords, emails, IPs, or customer data
+2. **ASP.NET Core defaults**: Query strings and request bodies not captured by auto-instrumentation
+3. **OTel Collector sanitization**: `attributes/sanitize` processor deletes `url.query`, `client.address`, `user_agent.original`, `net.peer.ip`, and cookie headers before export
+
+### Files Modified
+
+**New Infrastructure Files:**
+
+- `src/Presentation/Nop.Web.Framework/Infrastructure/InstrumentedProductService.cs`
+- `src/Presentation/Nop.Web.Framework/Infrastructure/InstrumentedPriceCalculationService.cs`
+- `src/Presentation/Nop.Web.Framework/Infrastructure/InstrumentedProductRepository.cs`
+- `src/Presentation/Nop.Web.Framework/Infrastructure/OpenTelemetryStartup.cs`
+- `src/Presentation/Nop.Web.Framework/Infrastructure/NopTelemetry.cs`
+- `src/Presentation/Nop.Web.Framework/Infrastructure/HttpPathSpanProcessor.cs`
+- `src/Presentation/Nop.Web.Framework/Mvc/Filters/TracingActionFilter.cs`
+- `src/Presentation/Nop.Web.Framework/Infrastructure/Events/ProductDetailPageViewedEvent.cs`
+- `src/Presentation/Nop.Web.Framework/Infrastructure/Events/ProductPageViewTelemetryConsumer.cs`
+- `docker-compose.yml`
+- `infra/otel-collector/config.yaml`
+- `infra/grafana/provisioning/dashboards/catalog-search-flow.json`
+- `infra/grafana/provisioning/datasources/datasources.yml`
+- `loadtest/search-flow.js`
+
+**Zero changes to business logic files.** All instrumentation implemented via decorator pattern and middleware.
