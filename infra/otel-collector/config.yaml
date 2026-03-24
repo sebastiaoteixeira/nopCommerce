@@ -9,12 +9,6 @@ receivers:
 processors:
   attributes/sanitize:
     actions:
-      - key: url.query
-        action: delete
-      - key: http.url
-        action: delete
-      - key: user_agent.original
-        action: delete
       - key: client.address
         action: delete
       - key: net.peer.ip
