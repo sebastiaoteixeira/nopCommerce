@@ -30,30 +30,10 @@ Consumers are auto-discovered at startup (`Nop.Web.Framework/Infrastructure/NopS
 Events fall into three buckets:
 
 - **Entity lifecycle events**  - `EntityInsertedEvent<T>`, `EntityUpdatedEvent<T>`, `EntityDeletedEvent<T>`  - fired automatically by the repository layer on every CRUD operation.
-- **Domain events**  - `OrderPlacedEvent`, `OrderPaidEvent`, `OrderStatusChangedEvent`, etc.  - fired explicitly by service methods at specific points in business workflows.
+- **Domain events**  - fired explicitly by service methods at specific points in business workflows (e.g., order lifecycle, customer registration).
 - **UI/pipeline events**  - model-prepared events, rendering hooks  - fired by the presentation layer.
 
 From an observability standpoint, this event system is the most interesting part of the architecture. Every meaningful state change goes through `PublishAsync`, which means we can instrument the publisher itself and get visibility into all event dispatches without touching business logic.
-
-#### OrderProcessingService  - The Order Placement Flow
-
-`OrderProcessingService.PlaceOrderAsync()` is the main entry point for placing an order. It runs through a well-defined sequence of private methods:
-
-1. **PreparePlaceOrderDetailsAsync()**  - validates the cart, customer, addresses; calculates totals, discounts, tax, and shipping
-2. **GetProcessPaymentResultAsync()**  - hands off to `PaymentService.ProcessPaymentAsync()`, which loads the right payment plugin and processes the charge
-3. **SaveOrderDetailsAsync()**  - writes the `Order` entity to the database, along with billing/shipping addresses
-4. **MoveShoppingCartItemsToOrderItemsAsync()**  - turns each `ShoppingCartItem` into an `OrderItem`, adjusts inventory through `ProductService.AdjustInventoryAsync()`, and fires a `ShoppingCartItemMovedToOrderItemEvent` per item
-5. **SaveDiscountUsageHistoryAsync()** / **SaveGiftCardUsageHistoryAsync()**  - bookkeeping
-6. **SendNotificationsAndSaveNotesAsync()**  - emails (customer, store owner, vendors) and order notes
-7. Publishes **OrderPlacedEvent**
-8. **CheckOrderStatusAsync()** / **SetOrderStatusAsync()**  - evaluates order state and transitions it, publishing `OrderStatusChangedEvent`
-9. **ProcessOrderPaidAsync()**  - if the payment was captured immediately, fires `OrderPaidEvent`
-
-There is also optional mutex-based locking (`PlaceOrderWithLock` setting) to prevent duplicate orders within a configurable time window, backed by `IStaticCacheManager`.
-
-#### PaymentService
-
-`PaymentService.ProcessPaymentAsync()` has a fast path for zero-amount orders (marks them as Paid immediately) and delegates everything else to the active payment plugin through `IPaymentPluginManager`. There is no logging inside this service  - whether a payment succeeded or failed is only visible from the `ProcessPaymentResult` object returned to the caller. This is a blind spot.
 
 #### Logging  - DefaultLogger
 
@@ -125,10 +105,10 @@ For this assignment, none of these changes were necessary. The decorator pattern
 
 3. **InstrumentedProductRepository** inherits from `EntityRepository<Product>` and overrides key operations (`GetByIdAsync`, `GetAllPagedAsync`, `GetAllAsync`, `InsertAsync`, `UpdateAsync`, `DeleteAsync`). Registered as `IRepository<Product>`  - the closed-generic registration overrides the open-generic `IRepository<>` → `EntityRepository<>` from NopDbStartup. No change to EntityRepository.cs or any service that injects `IRepository<Product>`.
 
-4. **TracingActionFilter** is registered globally via `MvcOptions.Filters`  - no change to BaseController or any controller class.
+4. **TracingActionFilter** is registered globally via `MvcOptions.Filters`  - no change to BaseController or any controller class. For product page view tracking, the filter publishes a `ProductDetailPageViewedEvent` through nopCommerce's own `IEventPublisher` rather than injecting `IProductService` directly. A separate `ProductPageViewTelemetryConsumer` handles the metric recording  - keeping the filter decoupled from the service layer and following the same event-driven pattern nopCommerce uses internally.
 
 5. **HttpPathSpanProcessor** is a custom `BaseProcessor<Activity>` that runs in the OTel pipeline  - no change to ASP.NET Core middleware or routing.
 
-6. **OTel Collector PII sanitization** is configured in `infra/otel-collector/config.yaml`  - no application code changes needed for sensitive data exclusion.
+6. **OTel Collector PII sanitization** is configured in `infra/otel-collector/config.yaml`  - no application code changes needed for sensitive data exclusion. The collector strips `client.address`, `net.peer.ip`, and cookie headers before export. Non-PII attributes like `url.query` and `user_agent.original` are deliberately kept  - they carry debugging value (search terms, browser context) without being personally identifiable.
 
 The only "infrastructure boundary" change was adding three NuGet packages to `Nop.Web.Framework.csproj` and creating `OpenTelemetryStartup.cs` as an `INopStartup`  - the same pattern nopCommerce uses for all its own startup configuration. This is the minimal footprint possible for adding OpenTelemetry to a .NET application.

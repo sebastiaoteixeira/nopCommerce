@@ -110,7 +110,7 @@ Access the services:
 Execute the k6 load test to generate telemetry data:
 
 ```bash
-k6 run loadtest/search-flow.js
+docker run --rm --network=host -v $(pwd)/loadtest:/loadtest grafana/k6 run /loadtest/search-flow.js
 ```
 
 ### Dashboard Screenshots
@@ -147,9 +147,9 @@ k6 run loadtest/search-flow.js
 
 Three-layer PII protection strategy:
 
-1. **Code-level tags**: Only structural metadata (booleans, counts, IDs)  - never keywords, emails, IPs, or customer data
-2. **ASP.NET Core defaults**: Query strings and request bodies not captured by auto-instrumentation
-3. **OTel Collector sanitization**: `attributes/sanitize` processor deletes `url.query`, `client.address`, `user_agent.original`, `net.peer.ip`, and cookie headers before export
+1. **Code-level tags**: Only structural metadata (booleans, counts, IDs) — never emails, IPs, or customer data
+2. **ASP.NET Core defaults**: Request bodies not captured by auto-instrumentation
+3. **OTel Collector sanitization**: `attributes/sanitize` processor deletes `client.address`, `net.peer.ip`, and cookie headers before export
 
 ### Files Modified
 
