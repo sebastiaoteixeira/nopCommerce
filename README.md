@@ -80,13 +80,36 @@ Create a new graphical theme or develop a new plugin or integration and sell it 
 As a free and open-source project, we are very grateful to everyone who helps us to develop nopCommerce. Please find more details about the options and bonuses for contributors at [contribute page](https://www.nopcommerce.com/contribute?utm_source=github&utm_medium=referral&utm_campaign=contribute&utm_content=text).
 
 
-## Observability Setup
+## Observability Assignment
 
 This fork adds OpenTelemetry instrumentation to the "Customer searches and views a product" flow (Catalogue · Search · Pricing).
 
+### Repository Structure
+
+```
+/
+├── README.md                  ← This file
+├── ANALYSIS.md                ← Architecture analysis of nopCommerce
+├── REPORT.md                  ← Instrumentation report (design, diagrams, metrics)
+├── CRITIQUE.md                ← Critique of nopCommerce's observability
+├── presentation/              ← Presentation slides
+│   └── AS - Individual Assignment.pdf
+├── assessment/
+│   ├── diagrams/              ← Architecture diagrams
+│   │   └── component-diagram.png
+│   ├── dashboards/
+│   │   └── screenshots/       ← Grafana & Jaeger screenshots
+│   ├── load-test/             ← k6 load test scripts
+│   │   ├── search-flow.js
+│   │   └── search-book.js
+│   └── observability/         ← OTel Collector, Prometheus, Grafana configs
+├── infra/                     ← Docker infrastructure (OTel, Grafana, Prometheus)
+└── src/                       ← nopCommerce source code
+```
+
 ### Architecture Diagram
 
-![Component Diagram](diagrams/component-diagram.png)
+![Component Diagram](assessment/diagrams/component-diagram.png)
 
 ### Quick Start
 
@@ -110,25 +133,25 @@ Access the services:
 Execute the k6 load test to generate telemetry data:
 
 ```bash
-docker run --rm --network=host -v $(pwd)/loadtest:/loadtest grafana/k6 run /loadtest/search-flow.js
+docker run --rm --network=host -v $(pwd)/assessment/load-test:/loadtest grafana/k6 run /loadtest/search-flow.js
 ```
 
 ### Dashboard Screenshots
 
 #### BI Indicators
-![BI Indicators](screenshots/grafana-bi-indicators.png)
+![BI Indicators](assessment/dashboards/screenshots/grafana-bi-indicators.png)
 
 #### Product Search, Catalog & Pricing Pipeline
-![Pipeline](screenshots/grafana-pipeline.png)
+![Pipeline](assessment/dashboards/screenshots/grafana-pipeline.png)
 
 #### General Performance Indicators
-![General Performance](screenshots/grafana-general-performance.png)
+![General Performance](assessment/dashboards/screenshots/grafana-general-performance.png)
 
 #### Jaeger — Trace Search
-![Jaeger Search](screenshots/jaeger-search-traces.png)
+![Jaeger Search](assessment/dashboards/screenshots/jaeger-search-traces.png)
 
 #### Jaeger — Trace Detail (Search Pipeline)
-![Jaeger Trace Detail](screenshots/jaeger-trace-detail.png)
+![Jaeger Trace Detail](assessment/dashboards/screenshots/jaeger-trace-detail.png)
 
 ### Custom Metrics
 
@@ -168,6 +191,6 @@ Three-layer PII protection strategy:
 - `infra/otel-collector/config.yaml`
 - `infra/grafana/provisioning/dashboards/catalog-search-flow.json`
 - `infra/grafana/provisioning/datasources/datasources.yml`
-- `loadtest/search-flow.js`
+- `assessment/load-test/search-flow.js`
 
 **Zero changes to business logic files.** All instrumentation implemented via decorator pattern and middleware.

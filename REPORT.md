@@ -184,13 +184,13 @@ flowchart TD
         direction LR
         L2[Auto-instrumentation]
         L2 -->|captures| T2["http.method: GET\nhttp.route: /search\nhttp.status_code: 200"]
-        L2 -.->|omits by default| X2["url.query, request body"]
+        L2 -.->|omits by default| X2["request body"]
     end
 
     subgraph Layer 3  - OTel Collector
         direction LR
         L3["attributes/sanitize\nprocessor"]
-        L3 -->|deletes| X3["url.query\nhttp.url\nuser_agent.original\nclient.address\nnet.peer.ip\ncookie headers"]
+        L3 -->|deletes| X3["client.address\nnet.peer.ip\ncookie headers"]
     end
 
     Layer 1 --> Layer 2 --> Layer 3 --> Clean[Clean telemetry\nto Jaeger + Prometheus]
@@ -233,9 +233,9 @@ flowchart TD
 
 ## PII Protection (3 layers)
 
-1. **Code layer:** Tags use only structural metadata (booleans, counts). Never logs keywords, emails, IPs, or customer data.
-2. **ASP.NET Core instrumentation defaults:** Query strings are not captured by default.
-3. **OTel Collector processor (`attributes/sanitize`):** Deletes `url.query`, `http.url`, `user_agent.original`, `client.address`, `net.peer.ip`, and `http.request.header.cookie` before export.
+1. **Code layer:** Tags use only structural metadata (booleans, counts). Never logs emails, IPs, or customer data.
+2. **ASP.NET Core instrumentation defaults:** Request bodies not captured by auto-instrumentation.
+3. **OTel Collector processor (`attributes/sanitize`):** Deletes `client.address`, `net.peer.ip`, and cookie headers before export. Non-PII attributes like `url.query` and `user_agent.original` are retained for debugging value.
 
 ## Files Created/Modified
 
